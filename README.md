@@ -13,7 +13,7 @@ with AI that explains what went wrong. Install it, add your key, deploy.
 - **Logs** at warning and above.
 - **User sessions**: pages, clicks, requests and browser errors, linked to the
   exact server request each click caused.
-- **Alerts by email** (slow API, low Apdex, errors, traffic drop, new errors)
+- **Alerts in Slack** (slow API, low Apdex, errors, traffic drop, new errors)
   and **insights**, set up for you in the LoggerAI dashboard.
 
 Passwords, tokens, cookies, API keys and card numbers are masked before
