@@ -11,6 +11,9 @@ with AI that explains what went wrong. Install it, add your key, deploy.
 - **Exceptions**, grouped by cause, with stack traces, the release they
   started in and how many users they hit.
 - **Logs** at warning and above.
+- **The server itself**: CPU, memory, swap and disk every 30 seconds (inside
+  Docker, the container's own limits), so an incident can say "CPU on web-1
+  hit 97%" instead of leaving you to guess.
 - **User sessions**: pages, clicks, requests and browser errors, linked to the
   exact server request each click caused.
 - **Alerts in Slack** (slow API, low Apdex, errors, traffic drop, new errors)
@@ -116,6 +119,7 @@ LoggerAI::report($e, ['order' => $order->id]);
 | `LOGGERAI_TRANSPORT` | `auto` | `buffer`, `sync` or `queue` |
 | `LOGGERAI_LOG_LEVEL` | `warning` | Lowest log level sent (`false` to turn off) |
 | `LOGGERAI_SESSIONS` | `true` | Browser sessions (needs the public key) |
+| `LOGGERAI_HOST_METRICS` | `true` | The server's CPU, memory and disk (Linux; load and disk elsewhere) |
 
 ## Support
 

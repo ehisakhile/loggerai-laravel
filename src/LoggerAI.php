@@ -4,6 +4,7 @@ namespace LoggerAI\Laravel;
 
 use Closure;
 use Illuminate\Contracts\Foundation\Application;
+use LoggerAI\Laravel\Support\HostMetrics;
 use Throwable;
 
 /**
@@ -15,7 +16,7 @@ use Throwable;
  */
 final class LoggerAI
 {
-    public const VERSION = '0.1.0';
+    public const VERSION = '0.2.0';
 
     public function __construct(private Application $app, private Recorder $recorder, private Transport $transport, private array $config)
     {
@@ -69,6 +70,7 @@ final class LoggerAI
         if (! $this->enabled()) {
             return;
         }
+        $this->sampleHost();
         $parts = $this->recorder->drain();
         if ($parts) {
             $this->transport->send($parts);
@@ -77,6 +79,22 @@ final class LoggerAI
         }
         if ($force && $this->transport->mode() === 'buffer') {
             $this->transport->flushIfDue(true);
+        }
+    }
+
+    /** The server's CPU, memory and disk, at most every 30 seconds per server. */
+    public function sampleHost(): void
+    {
+        if (! ($this->config['capture']['host'] ?? true)) {
+            return;
+        }
+        try {
+            $sample = HostMetrics::due($this->app->storagePath('loggerai'), $this->app->basePath());
+        } catch (Throwable) {
+            $sample = null;
+        }
+        if ($sample) {
+            $this->recorder->host($sample);
         }
     }
 

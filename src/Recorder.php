@@ -23,6 +23,8 @@ final class Recorder
 
     private array $checks = [];
 
+    private array $hosts = [];
+
     public function __construct(private Redactor $redactor, private string $basePath)
     {
     }
@@ -135,9 +137,15 @@ final class Recorder
         $this->checks[] = ['ts' => round(microtime(true), 3), 'name' => $name, 'ok' => $ok, 'ms' => round($ms, 2), 'detail' => $detail];
     }
 
+    /** The server's CPU, memory and disk (see Support\HostMetrics). */
+    public function host(array $sample): void
+    {
+        $this->hosts[] = $sample;
+    }
+
     public function pending(): int
     {
-        return count($this->requests) + count($this->errors) + count($this->logs) + count($this->checks);
+        return count($this->requests) + count($this->errors) + count($this->logs) + count($this->checks) + count($this->hosts);
     }
 
     /** Everything recorded so far, emptied. */
@@ -145,8 +153,9 @@ final class Recorder
     {
         $out = array_filter([
             'requests' => $this->requests, 'errors' => $this->errors, 'logs' => $this->logs, 'checks' => $this->checks,
+            'hosts' => $this->hosts,
         ]);
-        $this->requests = $this->errors = $this->logs = $this->checks = [];
+        $this->requests = $this->errors = $this->logs = $this->checks = $this->hosts = [];
 
         return $out;
     }

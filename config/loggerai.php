@@ -48,6 +48,9 @@ return [
         // A one-way hash of the signed-in user's id, so LoggerAI can count
         // affected users. Never their name or email.
         'user' => true,
+        // The server's CPU, memory and disk (every 30 seconds), so LoggerAI
+        // can tell when the server itself is why the app got slow.
+        'host' => env('LOGGERAI_HOST_METRICS', true),
     ],
 
     // Record what users do in the browser (pages, clicks, requests, errors)
