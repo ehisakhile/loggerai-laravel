@@ -12,12 +12,15 @@ final class Redactor
     public const MASK = '[REDACTED]';
 
     private const WORDS = ['password', 'passwd', 'pwd', 'pass', 'passphrase', 'secret', 'token', 'otp', 'pin', 'cvv', 'cvc',
-        'ssn', 'cookie', 'authorization', 'auth', 'signature', 'sig', 'credential', 'credentials', 'bvn', 'nin'];
+        'ssn', 'cookie', 'authorization', 'auth', 'signature', 'sig', 'credential', 'credentials', 'bvn', 'nin',
+        // where someone is: user_lat, userLng, pickup_latitude... (analytics never keep locations)
+        'lat', 'lng', 'lon', 'latitude', 'longitude', 'coords', 'coordinates', 'geolocation', 'gps'];
 
     private const JOINED = ['apikey', 'accesskey', 'privatekey', 'secretkey', 'cardnumber', 'clientsecret', 'sessionid',
-        'authtoken', 'accesstoken', 'refreshtoken', 'idtoken', 'csrftoken', 'xsrf', 'setcookie'];
+        'authtoken', 'accesstoken', 'refreshtoken', 'idtoken', 'csrftoken', 'xsrf', 'setcookie',
+        'latlng', 'latlon', 'lnglat', 'lonlat', 'geopoint'];
 
-    private const URL_EXTRA = ['key', 'code', 'access_token', 'id_token'];
+    private const URL_EXTRA = ['key', 'code', 'access_token', 'id_token', 'll', 'location']; // ?ll=6.52,3.37 (maps)
 
     /** @var string[] */
     private array $extra;
@@ -55,6 +58,8 @@ final class Redactor
     public function string(string $s): string
     {
         $s = preg_replace('/eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/', '[REDACTED_JWT]', $s) ?? $s;
+        // A latitude,longitude pair anywhere, e.g. in a path: /nearby/6.524379,3.379206
+        $s = preg_replace('/(?<![\d.])-?\d{1,3}\.\d{4,}\s*(?:,|%2C)\s*-?\d{1,3}\.\d{4,}(?![\d.])/i', '[REDACTED_LOCATION]', $s) ?? $s;
 
         return preg_replace('/\b(bearer|basic|token)\s+[A-Za-z0-9\-._~+\/]{12,}=*/i', '$1 '.self::MASK, $s) ?? $s;
     }
