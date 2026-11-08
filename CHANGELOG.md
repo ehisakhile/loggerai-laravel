@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.2
+
+Mail errors are now sent without the people in them.
+
+A mail server's refusal names the recipient, and Symfony Mailer quotes back the login it used
+or an address it couldn't parse:
+
+```
+Expected response code "250/251/252" but got code "550", with message
+"550 5.1.1 <ada@example.com>: Recipient address rejected: User unknown in virtual mailbox table".
+```
+
+From 0.2.2 this arrives as `... "550 5.1.1 <?>: Recipient address rejected: User unknown in
+virtual mailbox table".` The SMTP codes, the server's reason and the mail host stay. Addresses
+and long numbers are removed from mail exceptions and from log lines built from one.
+
+### Upgrading
+
+Run `composer update loggerai/laravel` and deploy; it's on by default. If your app already
+rewrites mail errors (for example `$exceptions->map(TransportExceptionInterface::class, ...)`),
+you can keep it or remove it. To turn it off, set `LOGGERAI_REDACT_MAIL_ADDRESSES=false`, or
+add `'redact_mail_addresses' => env('LOGGERAI_REDACT_MAIL_ADDRESSES', true),` to a published
+`config/loggerai.php` to see the setting.
+
 ## 0.2.1
 
 Database errors are now sent without the data in them.
@@ -75,7 +99,7 @@ To turn it off (only if no personal data ever goes through your database), set
 
 ### Not covered
 
-- Mail errors still include the recipient's email address.
+- Mail errors still include the recipient's email address (fixed in 0.2.2).
 - Errors already sent before you upgrade stay as they are in LoggerAI.
 - The values are removed from what LoggerAI receives. Your own log files
   (`storage/logs`) still get Laravel's original message.

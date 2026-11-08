@@ -25,15 +25,15 @@ final class Redactor
     /** @var string[] */
     private array $extra;
 
-    public function __construct(array $extra = [], private bool $queryValues = true)
+    public function __construct(array $extra = [], private bool $queryValues = true, private bool $mailAddresses = true)
     {
         $this->extra = array_map('strtolower', $extra);
     }
 
-    /** An exception's message as it may leave the app: a database error loses the values in it. */
+    /** An exception's message as it may leave the app: database and mail errors lose the data in them. */
     public function exceptionMessage(\Throwable $e): string
     {
-        $clean = $this->queryValues ? QueryErrors::message($e) : null;
+        $clean = ($this->queryValues ? QueryErrors::message($e) : null) ?? ($this->mailAddresses ? MailErrors::message($e) : null);
 
         // Already clean: masking again as text would cut the SQL short and lose its placeholders.
         return $clean !== null ? $this->mask(mb_substr($clean, 0, 1000)) : $this->string(mb_substr($e->getMessage(), 0, 1000));
@@ -67,7 +67,9 @@ final class Redactor
     public function string(string $s): string
     {
         // A log line or health check built from a database error's message.
-        return $this->mask($this->queryValues ? QueryErrors::text($s) : $s);
+        $s = $this->queryValues ? QueryErrors::text($s) : $s;
+
+        return $this->mask($this->mailAddresses ? MailErrors::text($s) : $s);
     }
 
     private function mask(string $s): string

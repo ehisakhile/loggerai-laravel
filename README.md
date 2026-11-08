@@ -31,6 +31,10 @@ placeholders and keeps the table, column and key names. Turn it off with
 `LOGGERAI_REDACT_QUERY_VALUES=false` only if no personal data ever goes through
 your database.
 
+Mail errors are sent without the recipient: "550 5.1.1 <ada@example.com>:
+Recipient address rejected" arrives as "550 5.1.1 <?>: Recipient address
+rejected" (`LOGGERAI_REDACT_MAIL_ADDRESSES=false` turns it off).
+
 Laravel 10, 11, 12 and 13 on PHP 8.1+. Works on a VPS, Laravel Forge,
 Docker, Laravel Vapor and shared hosting.
 

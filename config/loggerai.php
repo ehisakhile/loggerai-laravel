@@ -82,4 +82,8 @@ return [
     // the SQL with ? placeholders and the table, column and key names stay. Turn off only if no
     // personal data ever goes through your database.
     'redact_query_values' => env('LOGGERAI_REDACT_QUERY_VALUES', true),
+
+    // A mail error names the people it was for ("550 5.1.1 <ada@example.com>: Recipient address
+    // rejected"). Addresses and long numbers are taken out; the SMTP codes and the reason stay.
+    'redact_mail_addresses' => env('LOGGERAI_REDACT_MAIL_ADDRESSES', true),
 ];
