@@ -24,6 +24,13 @@ anything leaves your server or your users' browsers. No request bodies are
 sent from the server, and users are counted by a one-way hash of their id,
 never their name or email.
 
+Database errors are sent without the data in them. Laravel writes a failed
+query's values into the error ("Duplicate entry 'ada@example.com'", and the SQL
+with the values filled in); LoggerAI sends the error with the SQL's `?`
+placeholders and keeps the table, column and key names. Turn it off with
+`LOGGERAI_REDACT_QUERY_VALUES=false` only if no personal data ever goes through
+your database.
+
 Laravel 10, 11, 12 and 13 on PHP 8.1+. Works on a VPS, Laravel Forge,
 Docker, Laravel Vapor and shared hosting.
 

@@ -44,7 +44,7 @@ final class LoggerAIServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/loggerai.php', 'loggerai');
 
         $this->app->singleton(Recorder::class, fn ($app) => new Recorder(
-            new Redactor((array) $app['config']->get('loggerai.redact', [])), $app->basePath()));
+            new Redactor((array) $app['config']->get('loggerai.redact', []), (bool) $app['config']->get('loggerai.redact_query_values', true)), $app->basePath()));
         $this->app->singleton(Transport::class, fn ($app) => new Transport(
             (array) $app['config']->get('loggerai'), $app->storagePath('loggerai')));
         $this->app->singleton(LoggerAI::class, fn ($app) => new LoggerAI(

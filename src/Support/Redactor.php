@@ -25,9 +25,18 @@ final class Redactor
     /** @var string[] */
     private array $extra;
 
-    public function __construct(array $extra = [])
+    public function __construct(array $extra = [], private bool $queryValues = true)
     {
         $this->extra = array_map('strtolower', $extra);
+    }
+
+    /** An exception's message as it may leave the app: a database error loses the values in it. */
+    public function exceptionMessage(\Throwable $e): string
+    {
+        $clean = $this->queryValues ? QueryErrors::message($e) : null;
+
+        // Already clean: masking again as text would cut the SQL short and lose its placeholders.
+        return $clean !== null ? $this->mask(mb_substr($clean, 0, 1000)) : $this->string(mb_substr($e->getMessage(), 0, 1000));
     }
 
     public function isSensitive($key): bool
@@ -56,6 +65,12 @@ final class Redactor
     }
 
     public function string(string $s): string
+    {
+        // A log line or health check built from a database error's message.
+        return $this->mask($this->queryValues ? QueryErrors::text($s) : $s);
+    }
+
+    private function mask(string $s): string
     {
         $s = preg_replace('/eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/', '[REDACTED_JWT]', $s) ?? $s;
         // A latitude,longitude pair anywhere, e.g. in a path: /nearby/6.524379,3.379206

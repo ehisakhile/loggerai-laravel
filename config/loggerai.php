@@ -76,4 +76,10 @@ return [
     // Extra field names to mask (on top of passwords, tokens, cookies,
     // authorization, API keys, card numbers and the like).
     'redact' => [],
+
+    // A failed query's error carries the values it was run with ("Duplicate entry 'ada@example.com'",
+    // and the SQL with the values written in). They're taken out before anything is sent; the error,
+    // the SQL with ? placeholders and the table, column and key names stay. Turn off only if no
+    // personal data ever goes through your database.
+    'redact_query_values' => env('LOGGERAI_REDACT_QUERY_VALUES', true),
 ];

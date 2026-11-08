@@ -109,7 +109,7 @@ final class Recorder
         $this->errors[] = [
             'ts' => round(microtime(true), 3),
             'type' => get_class($e),
-            'message' => $this->redactor->string(mb_substr($e->getMessage(), 0, 1000)),
+            'message' => $this->redactor->exceptionMessage($e),
             'handled' => false,
             'route' => $this->current['route'] ?? null,
             'method' => $this->current['method'] ?? null,
@@ -134,7 +134,7 @@ final class Recorder
 
     public function check(string $name, bool $ok, float $ms, ?string $detail = null): void
     {
-        $this->checks[] = ['ts' => round(microtime(true), 3), 'name' => $name, 'ok' => $ok, 'ms' => round($ms, 2), 'detail' => $detail];
+        $this->checks[] = ['ts' => round(microtime(true), 3), 'name' => $name, 'ok' => $ok, 'ms' => round($ms, 2), 'detail' => $detail === null ? null : $this->redactor->string($detail)];
     }
 
     /** The server's CPU, memory and disk (see Support\HostMetrics). */
