@@ -34,6 +34,14 @@ names stay, so the error is still easy to debug. Values are removed from:
 The same failure from different users now also groups as one error in LoggerAI instead of
 one per value.
 
+### Also in 0.2.1: locations are never kept
+
+Fields named like a location (`lat`, `lng`, `lon`, `latitude`, `longitude`, `coords`,
+`geolocation`, `gps`, and names such as `user_lat`, `userLng`, `pickup_latitude`), the `ll` and
+`location` URL parameters, and latitude,longitude pairs anywhere (for example
+`/nearby/6.524379,3.379206`) are now masked before anything is sent. If you relied on seeing
+coordinates in LoggerAI, they'll show as `[REDACTED]` or `[REDACTED_LOCATION]` from 0.2.1.
+
 ### Upgrading
 
 1. Update the package:
