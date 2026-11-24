@@ -9,6 +9,7 @@ use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\ResponseReceived;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Mail\Events\MessageSent;
@@ -19,6 +20,7 @@ use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Redis\Events\CommandExecuted;
 use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Queue\Queue as BaseQueue;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use LoggerAI\Laravel\Console\FlushCommand;
@@ -28,6 +30,7 @@ use LoggerAI\Laravel\Console\TestCommand;
 use LoggerAI\Laravel\Http\Middleware\TrackRequests;
 use LoggerAI\Laravel\Jobs\SendBatch;
 use LoggerAI\Laravel\Support\Redactor;
+use LoggerAI\Laravel\Support\Trace;
 use Throwable;
 
 /**
@@ -101,16 +104,18 @@ final class LoggerAIServiceProvider extends ServiceProvider
         }
 
         if ($capture['http_client'] ?? true) {
+            $this->carryTraceOnHttpCalls($loggerai, $recorder, $transport);
             $events->listen(ResponseReceived::class, function (ResponseReceived $e) use ($recorder, $transport) {
                 if ($transport->sending) {
                     return;
                 }
                 $stats = method_exists($e->response, 'handlerStats') ? $e->response->handlerStats() : [];
                 $ms = isset($stats['total_time']) ? (float) $stats['total_time'] * 1000 : 0.0;
-                $recorder->dependency($this->host($e->request->url()), $e->request->method(), $ms, $e->response->status() < 500);
+                $recorder->dependency($this->host($e->request->url()), $e->request->method(), $ms, $e->response->status() < 500,
+                    $this->callSpan($recorder, $e->request), 'client', $e->response->status());
             });
             $events->listen(ConnectionFailed::class, function (ConnectionFailed $e) use ($recorder) {
-                $recorder->dependency($this->host($e->request->url()), $e->request->method(), 0.0, false);
+                $recorder->dependency($this->host($e->request->url()), $e->request->method(), 0.0, false, $this->callSpan($recorder, $e->request), 'client');
             });
         }
 
@@ -138,9 +143,24 @@ final class LoggerAIServiceProvider extends ServiceProvider
         }
 
         if ($capture['jobs'] ?? true) {
+            // A job queued during a request carries its trace, so the job joins it and the service
+            // map shows which service queued it (a worker deployed as its own service, too).
+            $service = (string) $loggerai->config('service', 'app');
+            BaseQueue::createPayloadUsing(function ($connection, $queue, $payload) use ($recorder, $service) {
+                if (! $recorder->active() || ($payload['displayName'] ?? null) === SendBatch::class) {
+                    return [];
+                }
+                $sid = Trace::spanId();
+                $recorder->dependency('queue:'.($queue ?: 'default'), 'PUBLISH', 0.0, true, $sid, 'producer');
+
+                return ['loggerai' => array_filter(['traceparent' => $recorder->traceparent($sid), 'caller' => $service, 'session' => $recorder->sessionId()])];
+            });
             $events->listen(JobProcessing::class, function (JobProcessing $e) use ($recorder) {
                 if (! $this->ours($e->job)) {
-                    $recorder->start('job', 'JOB');
+                    $carried = $e->job->payload()['loggerai'] ?? [];
+                    $carried = is_array($carried) ? $carried : [];
+                    $caller = Trace::caller($carried['caller'] ?? null);
+                    $recorder->start('job', 'JOB', null, null, null, Trace::parent($carried['traceparent'] ?? null), $caller, $caller ? 'queue' : null);
                     $recorder->setRoute($e->job->resolveName());
                 }
             });
@@ -206,6 +226,34 @@ final class LoggerAIServiceProvider extends ServiceProvider
     private function host(string $url): string
     {
         return parse_url($url, PHP_URL_HOST) ?: 'unknown';
+    }
+
+    /** Calls with the Http facade to the project's own services carry the trace and this service's name. */
+    private function carryTraceOnHttpCalls(LoggerAI $loggerai, Recorder $recorder, Transport $transport): void
+    {
+        $factory = $this->app->make(HttpFactory::class);
+        if (! method_exists($factory, 'globalRequestMiddleware')) {
+            return;  // Laravel before 10.14: calls are still timed, without carrying the trace
+        }
+        $service = (string) $loggerai->config('service', 'app');
+        $setting = $loggerai->config('propagate');
+        $factory->globalRequestMiddleware(function ($request) use ($recorder, $transport, $service, $setting) {
+            if ($transport->sending || ! $recorder->active() || $request->hasHeader('traceparent')
+                || ! Trace::propagates($request->getUri()->getHost(), $setting)) {
+                return $request;
+            }
+            $request = $request->withHeader('traceparent', $recorder->traceparent(Trace::spanId()))->withHeader('x-loggerai-caller', $service);
+
+            return $recorder->sessionId() ? $request->withHeader('x-loggerai-session', $recorder->sessionId()) : $request;
+        });
+    }
+
+    /** The span id this request gave a call (in its traceparent), when it's this request's trace. */
+    private function callSpan(Recorder $recorder, $request): ?string
+    {
+        $parent = Trace::parent(method_exists($request, 'header') ? $request->header('traceparent') : null);
+
+        return $parent && $parent[0] === $recorder->traceId() ? $parent[1] : null;
     }
 
     private function ours($job): bool

@@ -5,6 +5,7 @@ namespace LoggerAI\Laravel\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use LoggerAI\Laravel\LoggerAI;
+use LoggerAI\Laravel\Support\Trace;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -23,16 +24,13 @@ final class TrackRequests
         if (! $this->loggerai->enabled() || ! $this->loggerai->config('capture.requests', true) || $this->ignored($request)) {
             return $next($request);
         }
-        // W3C traceparent: 00-<trace id>-<span id>-<flags>
-        $trace = null;
-        if (preg_match('/^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/', (string) $request->header('traceparent'), $m)) {
-            $trace = $m[1];
-        }
+        // W3C traceparent: 00-<trace id>-<span id>-<flags>. The span is the caller's, which becomes this request's parent.
+        $parent = Trace::parent($request->header('traceparent'));
         $session = $request->header('x-loggerai-session');
         $session = is_string($session) && preg_match('/^[0-9a-fA-F-]{8,64}$/', $session) ? $session : null;
         $started = (float) $request->server('REQUEST_TIME_FLOAT', 0);
         $started = $started > 0 && microtime(true) - $started < 120 ? $started : null;  // Octane: per-worker, not per-request
-        $this->loggerai->recorder()->start('http', $request->getMethod(), $trace, $session, $started);
+        $this->loggerai->recorder()->start('http', $request->getMethod(), null, $session, $started, $parent, $request->header('x-loggerai-caller'));
 
         $response = $next($request);
 

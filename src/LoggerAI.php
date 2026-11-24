@@ -16,7 +16,7 @@ use Throwable;
  */
 final class LoggerAI
 {
-    public const VERSION = '0.2.0';
+    public const VERSION = '0.3.0';
 
     public function __construct(private Application $app, private Recorder $recorder, private Transport $transport, private array $config)
     {

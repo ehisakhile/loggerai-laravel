@@ -4,6 +4,7 @@ namespace LoggerAI\Laravel;
 
 use LoggerAI\Laravel\Support\Frames;
 use LoggerAI\Laravel\Support\Redactor;
+use LoggerAI\Laravel\Support\Trace;
 use Throwable;
 
 /**
@@ -29,20 +30,39 @@ final class Recorder
     {
     }
 
-    public function start(string $kind, string $method, ?string $traceId = null, ?string $sessionId = null, ?float $startedAt = null): void
+    /** $parent: [trace id, span id] from traceparent; $caller: the calling service's name. */
+    public function start(string $kind, string $method, ?string $traceId = null, ?string $sessionId = null, ?float $startedAt = null,
+        ?array $parent = null, ?string $caller = null, ?string $transport = null): void
     {
         $now = microtime(true);
+        $trace = $traceId ?: ($parent[0] ?? null) ?: bin2hex(random_bytes(16));
         $this->current = [
             'ts' => $startedAt ?? $now,
             'kind' => $kind,
             'method' => $method,
             'route' => null,
-            'trace_id' => $traceId ?: bin2hex(random_bytes(16)),
+            'trace_id' => $trace,
+            'span_id' => Trace::spanId(),
+            'parent_span_id' => $parent && $parent[0] === $trace ? $parent[1] : null,
+            'caller' => Trace::caller($caller),
+            'transport' => $transport,
             'session_id' => $sessionId,
             'deps' => [],
+            'spans' => [],
             'started' => $startedAt ?? $now,
             'error_fingerprint' => null,
         ];
+    }
+
+    public function sessionId(): ?string
+    {
+        return $this->current['session_id'] ?? null;
+    }
+
+    /** The traceparent for a call this request makes, with that call's own span id. */
+    public function traceparent(string $childSpanId): ?string
+    {
+        return $this->current ? '00-'.$this->current['trace_id'].'-'.$childSpanId.'-01' : null;
     }
 
     public function active(): bool
@@ -67,8 +87,10 @@ final class Recorder
         }
     }
 
-    /** A call to a database, cache or outside service, grouped by target and operation. */
-    public function dependency(string $target, string $operation, float $ms, bool $ok = true): void
+    /** A call to a database, cache or outside service, grouped by target and operation. Calls to
+     * other services and queues ($kind client or producer, with their span id) are also kept one by
+     * one, since they link the trace across services. */
+    public function dependency(string $target, string $operation, float $ms, bool $ok = true, ?string $spanId = null, ?string $kind = null, ?int $status = null): void
     {
         if (! $this->current) {
             return;  // outside any request/job (e.g. booting): not worth a record
@@ -80,6 +102,13 @@ final class Recorder
         $d['ms'] += $ms;
         if (! $ok) {
             $d['errors']++;
+        }
+        if ($spanId && in_array($kind, ['client', 'producer'], true) && count($this->current['spans']) < 200) {
+            $end = (microtime(true) - $this->current['started']) * 1000;
+            $this->current['spans'][] = array_filter([
+                'span_id' => $spanId, 'name' => ($kind === 'producer' ? 'publish ' : $operation.' ').$target, 'kind' => $kind, 'target' => $target,
+                'start_ms' => round(max(0.0, $end - $ms), 2), 'duration_ms' => round($ms, 2), 'ok' => $ok, 'status' => $status,
+            ], fn ($v) => $v !== null);
         }
     }
 
@@ -101,7 +130,13 @@ final class Recorder
             'session_id' => $c['session_id'],
             'user' => $user,
             'deps' => array_values(array_map(fn ($d) => ['target' => $d['target'], 'op' => $d['op'], 'count' => $d['count'], 'ms' => round($d['ms'], 2), 'errors' => $d['errors']], $c['deps'])),
-        ];
+        ] + array_filter([
+            'span_id' => $c['span_id'] ?? null,
+            'parent_span_id' => $c['parent_span_id'] ?? null,
+            'caller' => $c['caller'] ?? null,
+            'transport' => $c['transport'] ?? null,
+            'spans' => ($c['spans'] ?? []) ?: null,
+        ], fn ($v) => $v !== null);
     }
 
     public function exception(Throwable $e, ?int $status = null, array $context = []): void

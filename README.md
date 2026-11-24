@@ -116,6 +116,16 @@ Report an exception you've handled but still want to see:
 LoggerAI::report($e, ['order' => $order->id]);
 ```
 
+## Microservices
+
+Give each service its own name and use the same project key everywhere
+(`LOGGERAI_SERVICE=accounts`). Calls between services then link up on their
+own: a request is one trace from the first service to the last, and LoggerAI's
+Service map shows which service calls which. The middleware continues the trace
+each request is called with (`traceparent`), calls with the `Http` facade carry
+it on with this service's name (Laravel 10.14 and later), and so do queued jobs,
+which join the trace of the request that queued them. Only the project's own services get them: hosts without a dot (Docker and Kubernetes service names), private addresses, and `.internal`, `.local` and `.svc.cluster.local` names. Outside APIs (Stripe, OpenAI) never do. If your services call each other by a public name, list it (`LOGGERAI_PROPAGATE=api.acme.io,*.acme.io`; `all` or `none` also work).
+
 ## Configuration
 
 `php artisan vendor:publish --tag=loggerai-config` writes

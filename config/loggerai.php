@@ -23,6 +23,11 @@ return [
     // A version or git SHA, so LoggerAI can say "since release X".
     'release' => env('LOGGERAI_RELEASE'),
 
+    // Which outgoing calls (Http facade) and queued jobs carry the trace and this service's name, so
+    // LoggerAI links services into one trace and draws the service map. Default: your own services
+    // only (internal host names and private addresses). "all", "none", or extra hosts: "api.acme.io,*.acme.io".
+    'propagate' => env('LOGGERAI_PROPAGATE'),
+
     // How data leaves your app (never while a user waits):
     //   auto   - sync on Laravel Vapor, buffer everywhere else
     //   buffer - collect in storage/loggerai and send a batch every few

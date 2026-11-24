@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+Microservices: calls between your services link up into one trace.
+
+- A request continues the trace it was called with (`traceparent`) and records which of your services
+  called it (`x-loggerai-caller`), so LoggerAI's Service map draws the call.
+- Calls with the `Http` facade to your own services carry the trace and this service's name on
+  (Laravel 10.14 and later). Outside APIs never get them. `LOGGERAI_PROPAGATE` lists public names your
+  services use for each other, or turns it on (`all`) or off (`none`) everywhere.
+- Queued jobs carry the trace of the request that queued them, so the job joins it.
+
 ## 0.2.2
 
 Mail errors are now sent without the people in them.
